@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>외환의 수요·공급 시뮬레이터</title>
+
+<style>
+body{
+    font-family:"맑은 고딕",sans-serif;
+    background:#f4f7fb;
+    margin:20px;
+}
+h1{
+    text-align:center;
+}
+.container{
+    display:flex;
+    gap:20px;
+}
+.panel{
+    width:280px;
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+.info{
+    margin-top:15px;
+    background:#eef7ff;
+    padding:10px;
+    border-radius:8px;
+    line-height:1.8;
+}
+svg{
+    background:white;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+.value{
+    color:#0066cc;
+    font-weight:bold;
+}
+.question{
+    margin-top:25px;
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+.legend{
+    margin-top:15px;
+    font-size:14px;
+}
+.legend span{
+    display:inline-block;
+    width:18px;
+    height:3px;
+    vertical-align:middle;
+}
+button{
+    margin-top:15px;
+    padding:8px 14px;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+    background:#3b82f6;
+    color:white;
+}
+</style>
+</head>
+
+<body>
+
+<h1>외환의 수요·공급 시뮬레이터</h1>
+
+<div class="container">
+
+<div class="panel">
+
+<label><b>외환 수요 이동</b></label><br>
+<input type="range" id="demand" min="-30" max="30" value="0">
+<div>
+← 감소
+<span class="value" id="dText">0</span>
+증가 →
+</div>
+
+<br>
+
+<label><b>외환 공급 이동</b></label><br>
+<input type="range" id="supply" min="-30" max="30" value="0">
+<div>
+← 감소
+<span class="value" id="sText">0</span>
+증가 →
+</div>
+
+<div class="info">
+균형환율 :
+<b id="rate"></b> 원/달러
+
+<br>
+
+외환거래량 :
+<b id="qty"></b>
+
+</div>
+
+<button onclick="resetAll()">초기화</button>
+
+<div class="legend">
+<span style="background:#1d4ed8"></span> 수요곡선
+<br><br>
+<span style="background:#dc2626"></span> 공급곡선
+<br><br>
+<span style="background:#bbbbbb"></span> 이전 곡선
+</div>
+
+</div>
+
+<svg id="svg" width="700" height="520">
+
+<!-- 축 -->
+<line x1="70" y1="450" x2="640" y2="450" stroke="black" stroke-width="2"/>
+<line x1="70" y1="450" x2="70" y2="50" stroke="black" stroke-width="2"/>
+
+<text x="645" y="455">외환거래량</text>
+<text x="20" y="45">환율</text>
+
+<!-- 이전 곡선 -->
+<path id="oldDemand" stroke="#bbbbbb" fill="none" stroke-width="2"/>
+<path id="oldSupply" stroke="#bbbbbb" fill="none" stroke-width="2"/>
+
+<!-- 현재 -->
+<path id="demandCurve" stroke="#1d4ed8" fill="none" stroke-width="4"/>
+<path id="supplyCurve" stroke="#dc2626" fill="none" stroke-width="4"/>
+
+<circle id="eq" r="6" fill="green"/>
+<text id="label" font-size="14"></text>
+
+</svg>
+
+</div>
+
+<div class="question">
+
+<h2>생각해 볼 질문</h2>
+
+<ol>
+<li>외환 수요가 증가하면 환율과 외환거래량은 어떻게 변할까?</li>
+
+<li>외환 공급이 증가하면 환율은 왜 변할까?</li>
+
+<li>수요와 공급이 동시에 증가하면 거래량은 어떻게 될까?</li>
+
+<li>환율 상승은 수입 기업과 수출 기업에 어떤 영향을 줄까?</li>
+
+<li>우리나라 여행객이 해외여행을 많이 가면 외환 수요와 환율은 어떻게 변할까?</li>
+
+</ol>
+
+</div>
+
+<script>
+
+const demand=document.getElementById("demand");
+const supply=document.getElementById("supply");
+
+const dCurve=document.getElementById("demandCurve");
+const sCurve=document.getElementById("supplyCurve");
+
+const oldD=document.getElementById("oldDemand");
+const oldS=document.getElementById("oldSupply");
+
+let prevD="";
+let prevS="";
+
+function X(q){
+    return 70+q*5;
+}
+
+function Y(p){
+    return 450-p*3.5;
+}
+
+// 오른쪽 이동 = 증가
+function demandPath(shift){
+
+    let path="";
+
+    for(let q=0;q<=100;q++){
+
+        let actualQ=q-shift;
+
+        let p=100-actualQ;
+
+        let xx=X(q);
+
+        let yy=Y(p);
+
+        if(q==0) path+="M"+xx+","+yy;
+        else path+=" L"+xx+","+yy;
+
+    }
+
+    return path;
+
+}
+
+function supplyPath(shift){
+
+    let path="";
+
+    for(let q=0;q<=100;q++){
+
+        let actualQ=q-shift;
+
+        let p=actualQ;
+
+        let xx=X(q);
+
+        let yy=Y(p);
+
+        if(q==0) path+="M"+xx+","+yy;
+        else path+=" L"+xx+","+yy;
+
+    }
+
+    return path;
+
+}
+
+function update(){
+
+    oldD.setAttribute("d",prevD);
+    oldS.setAttribute("d",prevS);
+
+    let ds=parseInt(demand.value);
+    let ss=parseInt(supply.value);
+
+    document.getElementById("dText").textContent=ds;
+    document.getElementById("sText").textContent=ss;
+
+    let d=demandPath(ds);
+    let s=supplyPath(ss);
+
+    dCurve.setAttribute("d",d);
+    sCurve.setAttribute("d",s);
+
+    prevD=d;
+    prevS=s;
+
+    // 균형 계산
+    // 100-(Q-d)=Q-s
+
+    let Q=(100+ds+ss)/2;
+    let P=100-(Q-ds);
+
+    document.getElementById("rate").textContent=P.toFixed(1);
+    document.getElementById("qty").textContent=Q.toFixed(1);
+
+    let px=X(Q);
+    let py=Y(P);
+
+    document.getElementById("eq").setAttribute("cx",px);
+    document.getElementById("eq").setAttribute("cy",py);
+
+    let t=document.getElementById("label");
+    t.setAttribute("x",px+10);
+    t.setAttribute("y",py-10);
+    t.textContent="E ("+P.toFixed(1)+", "+Q.toFixed(1)+")";
+
+}
+
+function resetAll(){
+
+    demand.value=0;
+    supply.value=0;
+
+    prevD="";
+    prevS="";
+
+    oldD.setAttribute("d","");
+    oldS.setAttribute("d","");
+
+    update();
+
+}
+
+demand.oninput=update;
+supply.oninput=update;
+
+update();
+
+</script>
+
+</body>
+</html>
