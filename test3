@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>외환의 수요·공급 시뮬레이터</title>
+
+<style>
+body{
+    font-family:"맑은 고딕",sans-serif;
+    background:#f5f7fb;
+    margin:20px;
+}
+
+h1{
+    text-align:center;
+}
+
+.container{
+    display:flex;
+    gap:25px;
+    align-items:flex-start;
+}
+
+.panel{
+    width:300px;
+    background:white;
+    padding:18px;
+    border-radius:12px;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+
+svg{
+    background:white;
+    border-radius:12px;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+
+.info{
+    margin-top:18px;
+    background:#eef6ff;
+    padding:12px;
+    border-radius:8px;
+    line-height:2;
+    font-size:18px;
+}
+
+.value{
+    color:#0066cc;
+    font-weight:bold;
+}
+
+button{
+    margin-top:15px;
+    padding:8px 18px;
+    border:none;
+    border-radius:6px;
+    background:#2d7ff9;
+    color:white;
+    cursor:pointer;
+}
+
+.question{
+    margin-top:25px;
+    background:white;
+    padding:18px;
+    border-radius:12px;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+
+.legend{
+    margin-top:18px;
+    font-size:14px;
+}
+
+.legend div{
+    margin-bottom:8px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>외환의 수요·공급 시뮬레이터</h1>
+
+<div class="container">
+
+<div class="panel">
+
+<b>외환 수요</b><br>
+← 감소
+<input id="demand" type="range" min="-30" max="30" value="0">
+증가 →
+<div class="value">이동 : <span id="dValue">0</span></div>
+
+<br>
+
+<b>외환 공급</b><br>
+← 감소
+<input id="supply" type="range" min="-30" max="30" value="0">
+증가 →
+<div class="value">이동 : <span id="sValue">0</span></div>
+
+<div class="info">
+
+균형환율 :
+<b><span id="rate"></span></b> 원/달러
+
+<br>
+
+외환거래량 :
+<b><span id="qty"></span></b>
+
+</div>
+
+<button onclick="resetAll()">초기화</button>
+
+<div class="legend">
+
+<div>🔵 현재 수요곡선</div>
+<div>🔴 현재 공급곡선</div>
+<div>⚪ 이전 곡선</div>
+<div>🟢 균형점</div>
+
+</div>
+
+</div>
+
+<svg id="svg" width="760" height="540">
+
+<!-- 축 -->
+
+<line x1="70" y1="470" x2="690" y2="470"
+stroke="black" stroke-width="2"/>
+
+<line x1="70" y1="470" x2="70" y2="50"
+stroke="black" stroke-width="2"/>
+
+<text x="695" y="475">외환거래량</text>
+
+<text x="20" y="40">환율</text>
+
+<!-- 눈금 -->
+
+<g id="grid"></g>
+
+<!-- 이전 곡선 -->
+
+<path id="oldDemand"
+stroke="#bbbbbb"
+stroke-width="2"
+fill="none"/>
+
+<path id="oldSupply"
+stroke="#bbbbbb"
+stroke-width="2"
+fill="none"/>
+
+<!-- 현재 -->
+
+<path id="demandCurve"
+stroke="#1565c0"
+stroke-width="4"
+fill="none"/>
+
+<path id="supplyCurve"
+stroke="#d32f2f"
+stroke-width="4"
+fill="none"/>
+
+<!-- 보조선 -->
+
+<line id="vline"
+stroke="#999"
+stroke-dasharray="6,6"/>
+
+<line id="hline"
+stroke="#999"
+stroke-dasharray="6,6"/>
+
+<circle id="eq"
+r="7"
+fill="green"/>
+
+<text id="label"
+font-size="15"></text>
+
+</svg>
+
+</div>
+
+<div class="question">
+
+<h2>생각해 볼 질문</h2>
+
+<ol>
+
+<li>외환 수요가 증가하면 환율과 외환거래량은 어떻게 변할까?</li>
+
+<li>외환 공급이 증가하면 왜 환율은 하락할까?</li>
+
+<li>수요와 공급이 동시에 증가하면 거래량은 어떻게 될까?</li>
+
+<li>우리나라 사람들이 해외여행을 많이 가면 외환 수요는 어떻게 변할까?</li>
+
+<li>환율 상승은 수출 기업과 수입 기업에 어떤 영향을 줄까?</li>
+
+</ol>
+
+</div>
+
+<script>
+
+const demand=document.getElementById("demand");
+const supply=document.getElementById("supply");
+
+const dCurve=document.getElementById("demandCurve");
+const sCurve=document.getElementById("supplyCurve");
+
+const oldD=document.getElementById("oldDemand");
+const oldS=document.getElementById("oldSupply");
+
+let prevDemand="";
+let prevSupply="";
+
+function X(q){
+    return 70+q*6;
+}
+
+function Y(p){
+    return 470-p*3.5;
+}
+
+function drawDemand(shift){
+
+    let path="";
+
+    for(let q=0;q<=100;q++){
+
+        let p=100-(q-shift);
+
+        if(q==0)
+            path+="M"+X(q)+","+Y(p);
+
+        else
+            path+=" L"+X(q)+","+Y(p);
+
+    }
+
+    return path;
+
+}
+
+function drawSupply(shift){
+
+    let path="";
+
+    for(let q=0;q<=100;q++){
+
+        let p=(q-shift);
+
+        if(q==0)
+            path+="M"+X(q)+","+Y(p);
+
+        else
+            path+=" L"+X(q)+","+Y(p);
+
+    }
+
+    return path;
+
+}
+
+function update(){
+
+    oldD.setAttribute("d",prevDemand);
+    oldS.setAttribute("d",prevSupply);
+
+    let ds=Number(demand.value);
+    let ss=Number(supply.value);
+
+    document.getElementById("dValue").innerHTML=ds;
+    document.getElementById("sValue").innerHTML=ss;
+
+    let d=drawDemand(ds);
+    let s=drawSupply(ss);
+
+    dCurve.setAttribute("d",d);
+    sCurve.setAttribute("d",s);
+
+    prevDemand=d;
+    prevSupply=s;
+
+    // 균형 계산
+    let Q=(100+ds+ss)/2;
+    let P=100-(Q-ds);
+
+    document.getElementById("rate").innerHTML=P.toFixed(1);
+    document.getElementById("qty").innerHTML=Q.toFixed(1);
+
+    let px=X(Q);
+    let py=Y(P);
+
+    document.getElementById("eq").setAttribute("cx",px);
+    document.getElementById("eq").setAttribute("cy",py);
+
+    document.getElementById("vline").setAttribute("x1",px);
+    document.getElementById("vline").setAttribute("x2",px);
+    document.getElementById("vline").setAttribute("y1",470);
+    document.getElementById("vline").setAttribute("y2",py);
+
+    document.getElementById("hline").setAttribute("x1",70);
+    document.getElementById("hline").setAttribute("x2",px);
+    document.getElementById("hline").setAttribute("y1",py);
+    document.getElementById("hline").setAttribute("y2",py);
+
+    let label=document.getElementById("label");
+
+    label.setAttribute("x",px+10);
+    label.setAttribute("y",py-10);
+
+    label.textContent=
+    "균형("+
+    P.toFixed(1)+
+    ", "+
+    Q.toFixed(1)+")";
+
+}
+
+function resetAll(){
+
+    demand.value=0;
+    supply.value=0;
+
+    prevDemand="";
+    prevSupply="";
+
+    oldD.setAttribute("d","");
+    oldS.setAttribute("d","");
+
+    update();
+
+}
+
+function grid(){
+
+    let g=document.getElementById("grid");
+
+    for(let i=0;i<=10;i++){
+
+        let x=70+i*60;
+
+        let l=document.createElementNS("http://www.w3.org/2000/svg","line");
+
+        l.setAttribute("x1",x);
+        l.setAttribute("x2",x);
+        l.setAttribute("y1",470);
+        l.setAttribute("y2",465);
+        l.setAttribute("stroke","black");
+
+        g.appendChild(l);
+
+        let t=document.createElementNS("http://www.w3.org/2000/svg","text");
+
+        t.setAttribute("x",x-6);
+        t.setAttribute("y",490);
+        t.textContent=i*10;
+
+        g.appendChild(t);
+
+    }
+
+    for(let i=0;i<=10;i++){
+
+        let y=470-i*35;
+
+        let l=document.createElementNS("http://www.w3.org/2000/svg","line");
+
+        l.setAttribute("x1",65);
+        l.setAttribute("x2",70);
+        l.setAttribute("y1",y);
+        l.setAttribute("y2",y);
+        l.setAttribute("stroke","black");
+
+        g.appendChild(l);
+
+        let t=document.createElementNS("http://www.w3.org/2000/svg","text");
+
+        t.setAttribute("x",30);
+        t.setAttribute("y",y+5);
+        t.textContent=i*10;
+
+        g.appendChild(t);
+
+    }
+
+}
+
+grid();
+
+demand.oninput=update;
+supply.oninput=update;
+
+update();
+
+</script>
+
+</body>
+</html>
